@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  app:
+    image: prepaid_monitor
+    build: 
+      context: .
+      target: prod
+    container_name: prepaid_monitor
+    env_file:
+      - .env
+    volumes: 
+      - /Users/don/logs:/logs
+      - /Users/don/plsd-admin:/plsd-admin
+      - /Users/don/sys-utils:/sys-utils
+      - /tmp:/tmp
+
