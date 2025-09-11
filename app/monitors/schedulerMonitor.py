@@ -1,21 +1,21 @@
 import datetime
 
-from models.way4JobStatus import WAY4JobStatuses
-from models.way4ProcessLog import WAY4ProcessLog
-from models.way4SchInstances import WAY4SchInstances
-from datalayer.way4Query import Query
+import datalayer
+import models
 
-# from datalayer.PayCardDB import DB
-
-from models.way4Schedule import WAY4Schedule
-from monitors.monitor import Monitor
+import monitors
 
 
-class SchedulerMonitor(Monitor):
+class SchedulerMonitor(monitors.Monitor):
     def checkSchedulerInstances(self) -> None:
         """Veriy that all WAY4 Scheduler instances are running."""
         self.__logger.debug("Checking WAY4 Scheduler Instances")
-        instances = self.__settings.get("scheduler_instances")
+        expected_instances = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(self.checkSchedulerInstances.__name__)
+            .get("scheduler_instances")
+        )
 
         # with self.__db.session:
         #     instances, exception = self.__db.get_sch_instance_states(instances)
@@ -26,21 +26,27 @@ class SchedulerMonitor(Monitor):
         #         for arg in exception.args:
         #             self.__logger.error(arg)
 
-        instances = WAY4SchInstances(
+        actual_instances = models.WAY4SchInstances(
             self.__db,
-            Query.SchInstanceStateQuery(self.__settings.get("scheduler_instances")),
+            datalayer.Query.SchInstanceStateQuery(tuple(expected_instances)),
         ).get()
         alert = None
         alerts = []
         host = ""
 
-        for instance in instances:
+        for instance in expected_instances:
+            if instance not in [i.name for i in actual_instances]:
+                alert = f"PayCard WAY4 Scheduler instance {instance} is not configured."
+                alerts.append(alert)
+                host = "Unknown"
+
+        for instance in actual_instances:
             if instance.status != "R":
                 alert = f"PayCard WAY4 Scheduler instance {instance.name} on {instance.station} is not running."
                 alerts.append(alert)
                 host = instance.station
 
-        if alert == None:
+        if alert is None:
             self.__logger.debug("All PayCard WAY4 Scheduler instance(s) are running.")
         else:
             alerts.insert(
@@ -50,11 +56,19 @@ class SchedulerMonitor(Monitor):
                 self.checkSchedulerInstances.__name__, alert, alerts
             )
             incident["comments"] = "Please restart the stopped instances."
-            self.createAlert(self.__class__.__name__, alert, alerts, incident, host)
+            self.createAlert(
+                self.checkSchedulerInstances.__name__, alert, alerts, incident, host
+            )
 
     def checkForWAY4SchedulerInvaildJobs(self) -> None:
         """Check for WAY4 Scheduler jobs in an invalid state."""
-        instances = self.__settings.get("scheduler_instances")
+        self.__logger.debug("Check for WAY4 Scheduler jobs in an invalid state.")
+        instances = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(self.checkForWAY4SchedulerInvaildJobs.__name__)
+            .get("scheduler_instances")
+        )
 
         # with self.__db.session:
         # invalidJobs, exception = self.__db.get_invalid_jobs(instances)
@@ -65,15 +79,16 @@ class SchedulerMonitor(Monitor):
         #     for arg in exception.args:
         #         self.__logger.error(arg)
 
-        invalidJobs = WAY4JobStatuses(
-            self.__db, Query.InvalidJobsQuery(instances)
+        invalidJobs = models.WAY4JobStatuses(
+            self.__db,
+            datalayer.Query.InvalidJobsQuery(tuple(instances)),
         ).get()
         alert = None
         alerts = []
         host = ""
 
         if len(invalidJobs) > 0:
-            alert = f"There are invalid jobs in the PayCard WAY4 scheduler."
+            alert = "There are invalid jobs in the PayCard WAY4 scheduler."
             alerts.append(
                 "The following PayCard WAY4 scheduler Jobs are in an invalid state:"
             )
@@ -89,12 +104,15 @@ class SchedulerMonitor(Monitor):
             )
 
             incident["comments"] = "Please investigate."
-            self.createAlert(self.__class__.__name__, alert, alerts, incident, host)
+            self.createAlert(
+                self.checkSchedulerForDelays.__name__, alert, alerts, incident, host
+            )
 
         else:
+            self.__settings.get("configured_alerts")
             self.__logger.debug("No invalid jobs in the PayCard WAY4 scheduler.")
 
-    def checkSchedulerForDelays(self, prevMinutes: int) -> None:
+    def checkSchedulerForDelays(self) -> None:
         """Check for WAY4 Scheduler jobs that have not started or ended on time."""
         self.__logger.debug("Checking status of critical path jobs")
         self.__logger.debug("Updating schedule")
@@ -102,7 +120,25 @@ class SchedulerMonitor(Monitor):
         # with self.__db.session:
         # self.UpdateSchedule()
 
-        self.UpdateSchedule(prevMinutes=prevMinutes)
+        instances = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(self.checkSchedulerForDelays.__name__)
+            .get("scheduler_instances")
+        )
+        jobs_to_watch = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(self.checkSchedulerForDelays.__name__)
+            .get("jobs_to_watch")
+        )
+        interval_minutes = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(self.checkSchedulerForDelays.__name__)
+            .get("interval_minutes")
+        )
+        self.UpdateSchedule(instances, jobs_to_watch, prevMinutes=interval_minutes)
         now = datetime.datetime.now()
         buffer = datetime.timedelta(minutes=10)
         alert = None
@@ -110,7 +146,7 @@ class SchedulerMonitor(Monitor):
         host = ""
 
         for job in self.sched.list:
-            if job.expectedStart != None:
+            if job.expectedStart:
                 if (
                     now > job.expectedStart + buffer
                     and job.call_status != "R"
@@ -120,7 +156,7 @@ class SchedulerMonitor(Monitor):
                     alerts.append(alert)
                     host = job.station
 
-            if job.expectedEnd != None:
+            if job.expectedEnd:
                 if now > job.expectedEnd and job.call_status != "F":
                     alert = f"PayCard Scheduler job {job.jobname} has not ended by {job.expectedEnd}."
                     alerts.append(alert)
@@ -131,7 +167,7 @@ class SchedulerMonitor(Monitor):
                     f"PayCard WAY4 Scheduler job {job.jobname} is running."
                 )
 
-        if alert == None:
+        if alert is None:
             self.__logger.debug("All PayCard WAY4 Scheduler jobs are on schedule.")
         else:
             alerts.insert(0, "The following PayCard WAY4 scheduler jobs are delayed:")
@@ -141,13 +177,17 @@ class SchedulerMonitor(Monitor):
                 alerts,
             )
             incident["comments"] = "Please investigate the delay."
-            self.createAlert(self.__class__.__name__, alert, alerts, incident, host)
+            self.createAlert(
+                self.checkSchedulerForDelays.__name__, alert, alerts, incident, host
+            )
 
-    def UpdateSchedule(self, prevMinutes: int) -> None:
+    def UpdateSchedule(self, instances, jobs_to_watch, prevMinutes: int) -> None:
         """Update the internal representation of the WAY4 Scheduler."""
-        self.__logger.debug("Loading scheduler instances.")
-        instances = self.__settings.get("scheduler_instances")
         self.__logger.debug("Loading scheduler status.")
+
+        if not self.__sched_initialized:
+            self.sched = models.WAY4Schedule(jobs_to_watch)
+
         # self.jobStatuses, exception = self.__db.get_sch_job_states(instances)
 
         # if exception:
@@ -156,12 +196,12 @@ class SchedulerMonitor(Monitor):
         #     for arg in exception.args:
         #         self.__logger.error(arg)
 
-        self.jobStatuses = WAY4JobStatuses(
+        self.jobStatuses = models.WAY4JobStatuses(
             self.__db,
-            Query.JobStatusQuery(self.__settings.get("scheduler_instances")),
+            datalayer.Query.JobStatusQuery(tuple(instances)),
         ).get()
 
-        for job in self.sched.list:  # Status and Update Expected Times
+        for job in self.sched.list:
             for status in self.jobStatuses:
                 # if job.jobname != status.Sch_Job_State.name:
                 #     continue
@@ -182,10 +222,14 @@ class SchedulerMonitor(Monitor):
 
                 if status.ext_next_start:
                     job.expectedStart = status.ext_next_start
-                    duration = self.__settings["jobs_to_watch"][job.jobname][
-                        "daily_duration"
-                    ]
+                    duration = jobs_to_watch[job.jobname]["daily_duration"]
                     job.CalculateExpectedEndTime(duration)
+
+            if not job.station:
+                self.__logger.warning(
+                    f"Job {job.jobname} is not scheduled on any WAY4 Scheduler instance."
+                )
+                self.sched.list.remove(job)
 
         self.__logger.debug("Loading scheduler process data.")
         # processes, exception = self.__db.get_sch_job_processes()
@@ -198,12 +242,12 @@ class SchedulerMonitor(Monitor):
         last_run_time = self.get_last_run_time(prevMinutes)
 
         if self.__sched_initialized:
-            processes = WAY4ProcessLog(
-                self.__db, Query.ProcessLogJobQuery(last_run=last_run_time)
+            processes = models.WAY4ProcessLog(
+                self.__db, datalayer.Query.ProcessLogJobQuery(last_run=last_run_time)
             ).get()
         else:
-            processes = WAY4ProcessLog(
-                self.__db, Query.ProcessLogJobQuery(last_run=None)
+            processes = models.WAY4ProcessLog(
+                self.__db, datalayer.Query.ProcessLogJobQuery(last_run=None)
             ).get()
 
         for job in self.sched.list:  # Update Actual Times
@@ -222,7 +266,7 @@ class SchedulerMonitor(Monitor):
                     ):
                         self.__last_ach_import_finished = process.finished
 
-                    self.__notifier.sendNotication(
+                    self.__notifier.sendNotification(
                         job=job,
                         last_run_time=last_run_time,
                         last_ach_import_finished=self.__last_ach_import_finished,
@@ -238,6 +282,9 @@ class SchedulerMonitor(Monitor):
         self.__sched_initialized = True
 
         for job in self.sched.list:
+            if job.station is None:
+                continue
+
             self.__logger.debug(job)
 
     def get_last_run_time(self, prevMinutes: int) -> datetime.datetime:
@@ -253,11 +300,10 @@ class SchedulerMonitor(Monitor):
         return last_run
 
     def __init__(self, logger, settings, db, emailer, splunkApi, notifier):
-        Monitor.__init__(self, logger, settings, emailer, splunkApi)
+        monitors.Monitor.__init__(self, logger, settings, emailer, splunkApi)
         self.__logger = logger
         self.__settings = settings
         self.__db = db
-        self.sched = WAY4Schedule(self.__settings.get("jobs_to_watch"))
         self.__sched_initialized = False
         self.__last_ach_import_finished = None
         self.__notifier = notifier
@@ -272,11 +318,17 @@ class SchedulerMonitor(Monitor):
         #     for arg in exception.args:
         #         self.__logger.error(arg)
 
-        instances = WAY4SchInstances(
+        instances = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(self.checkSchedulerInstances.__name__)
+            .get("scheduler_instances")
+        )
+        sched_instances = models.WAY4SchInstances(
             self.__db,
-            Query.SchInstanceStateQuery(self.__settings.get("scheduler_instances")),
+            datalayer.Query.SchInstanceStateQuery(tuple(instances)),
         ).get()
         self.stations = {}
 
-        for instance in instances:
+        for instance in sched_instances:
             self.stations[instance.name] = instance.station

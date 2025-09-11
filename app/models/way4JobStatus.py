@@ -58,7 +58,7 @@ class WAY4JobStatuses:
     def getExpectedDates(self, jobname, duration):
         for job in self.list:
             if job.name == jobname:
-                if job.ext_next_start != None:
+                if job.ext_next_start is not None:
                     return job.ext_next_start, self.getExpectedEndTime(job, duration)
 
     def getExpectedEndTime(self, job, duration) -> datetime.datetime:

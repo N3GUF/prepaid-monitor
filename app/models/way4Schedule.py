@@ -14,7 +14,13 @@ class WAY4Job:
         self.actualEnd = None
 
     def __repr__(self):
-        return f"{self.jobname:<35}\t{self.station:<35}\t{self.status}\t{self.call_status}\t{self.expectedStart}\t{self.expectedEnd}\t{self.actualStart}\t{self.actualEnd}"
+        return f"{self.jobname:<35}{self.station:<25}{self.status:<15}{self.call_status:<15}{self._format(self.expectedStart):<18}{self._format(self.expectedEnd):<18}{self._format(self.actualStart):<18}{self._format(self.actualEnd):<18}"
+
+    def _format(self, dt: datetime.datetime | None) -> str:
+        if dt is None:
+            return "N/A"
+
+        return dt.strftime("%m-%d-%y %H:%M")
 
     def get(self):
         return self.list
@@ -46,25 +52,25 @@ class WAY4Job:
         actualEnd,
         station,
     ):
-        if status != None:
+        if status is not None:
             self.status = status
 
-        if status != None:
+        if call_status is not None:
             self.call_status = call_status
 
-        if expectedStart != None:
+        if expectedStart is not None:
             self.expectedStart = expectedStart
 
-        if expectedEnd != None:
+        if expectedEnd is not None:
             self.expectedEnd = expectedEnd
 
-        if actualStart != None:
+        if actualStart is not None:
             self.actualStart = actualStart
 
-        if actualEnd != None:
+        if actualEnd is not None:
             self.actualEnd = actualEnd
 
-        if station != None:
+        if station is not None:
             self.station = station
 
 
@@ -78,5 +84,5 @@ class WAY4Schedule:
     def getExpectedDates(self, jobname, duration):
         for job in self.list:
             if job.jobname == jobname:
-                if job.expectedStart != None:
+                if job.expectedStart is not None:
                     return job, self.getExpectedEndTime(job, duration)

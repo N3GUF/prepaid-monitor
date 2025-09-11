@@ -16,7 +16,6 @@ class Monitor:
         Returns:
             dictionary of incident data
         """
-        alertTypes = self.__settings.get("alert_types")
         incident = {
             "type": "Incident",
             "company": "Comdata Corporate Payments",
@@ -36,14 +35,29 @@ class Monitor:
         for alert in alerts:
             incident["description"] += f"{alert}\r\n"
 
-        incident["impact"] = alertTypes[methodName]["impact"]
-        incident["urgency"] = alertTypes[methodName]["urgency"]
-        incident["assignment_group"] = alertTypes[methodName]["assignment_group"]
+        incident["impact"] = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(methodName)
+            .get("impact")
+        )
+        incident["urgency"] = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(methodName)
+            .get("urgency")
+        )
+        incident["assignment_group"] = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(methodName)
+            .get("assignment_group")
+        )
         incident["correlation_id"] = methodName[0:50]
         return incident
 
     def createAlert(
-        self, className: str, alert: str, alertList: list, incident: dict, host: str
+        self, methodName: str, alert: str, alertList: list, incident: dict, host: str
     ) -> None:
         """Create an alert from the given data.
 
@@ -65,10 +79,10 @@ class Monitor:
                 alert,
                 content,
                 None,
-                self.__settings.get("send_alerts_from").get(className),
-                self.__settings.get("send_alerts_to"),
-                self.__settings.get("send_alerts_cc"),
-                self.__settings.get("send_alerts_bcc"),
+                self.__settings.get("alerts").get("emailFrom"),
+                self.__settings.get("alerts").get("emailTo"),
+                self.__settings.get("alerts").get("emailCc"),
+                self.__settings.get("alerts").get("emailBcc"),
             )
 
         if self.__settings.get("report_to_splunk"):

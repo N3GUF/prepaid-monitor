@@ -1,17 +1,30 @@
-import datetime
-import socket
+import models
 
-from models.linuxProcesses import LinuxProcesses
-from monitors.monitor import Monitor
+import monitors
 
 
-class ProcessMonitor(Monitor):
+class ProcessMonitor(monitors.Monitor):
     def checkExpectedProcesses(self):
         """Verify that other expected processes are running."""
         self.__logger.debug("Checking for expected processes")
-        user = self.__settings.get("prepaid_username")
-        servers = self.__settings.get("prepaid_servers")
-        expexctedProcesses = self.__settings.get("expected_processes")
+        user = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(self.checkExpectedProcesses.__name__)
+            .get("prepaid_username")
+        )
+        servers = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(self.checkExpectedProcesses.__name__)
+            .get("prepaid_servers")
+        )
+        expexctedProcesses = (
+            self.__settings.get("alerts")
+            .get("configured_alerts")
+            .get(self.checkExpectedProcesses.__name__)
+            .get("expected_processes")
+        )
 
         if not user:
             return
@@ -26,7 +39,7 @@ class ProcessMonitor(Monitor):
         alert = None
         alert_list = []
         alerts_by_server = {}
-        all_processes = LinuxProcesses(servers, user)
+        all_processes = models.LinuxProcesses(servers, user)
 
         for server, processes in all_processes.get().items():
             if len(processes) == 0:
@@ -69,7 +82,7 @@ class ProcessMonitor(Monitor):
             )
             incident["comments"] = "Please restart the stopped process(es)."
             self.createAlert(
-                self.__class__.__name__,
+                self.checkExpectedProcesses.__name__,
                 alerts_by_server[server][0],
                 alerts_by_server[server],
                 incident,
@@ -77,7 +90,7 @@ class ProcessMonitor(Monitor):
             )
 
     def __init__(self, logger, settings, emailer, splunkApi):
-        Monitor.__init__(self, logger, settings, emailer, splunkApi)
+        monitors.Monitor.__init__(self, logger, settings, emailer, splunkApi)
         self.__logger = logger
         self.__settings = settings
         self.__emailer = emailer

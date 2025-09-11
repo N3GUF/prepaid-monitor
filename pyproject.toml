@@ -1,0 +1,16 @@
+[project]
+name = "prepaid-monitor"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "certifi==2021.10.8",
+    "charset-normalizer==2.0.7",
+    "idna==3.3",
+    "oracledb>=3.1.1",
+    "pyyaml>=6.0.2",
+    "requests==2.26.0",
+    "schedule==1.1.0",
+    "urllib3==1.26.7",
+]

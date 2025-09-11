@@ -1,16 +1,12 @@
-import json
-import os
 import logging
+import os
 import time
-import schedule
-from classes.emailer import Emailer, IEmailer
-from classes.notificationManager import NoticationManager, INoticationManager
-from classes.splunkApi import SplunkApi
 
-# from datalayer.PayCardDB import DB
-from monitors.processMonitor import ProcessMonitor
-from monitors.schedulerMonitor import SchedulerMonitor
-from datalayer.way4Db import way4Db
+import datalayer
+import lib
+import monitors
+import schedule
+import yaml
 
 """                              Prepaid Monitor
 
@@ -21,7 +17,7 @@ from datalayer.way4Db import way4Db
 def init(name: str):
     configPath = os.environ.get("CONF_HOME")
     logPath = os.environ.get("LOG_HOME")
-    oraDbDsn = os.environ.get("ORA_DB_URL")
+    oraDbDsn = os.environ.get("ORA_DB_DSN")
     oraDbUser = os.environ.get("ORA_DB_USER")
     oraPwFile = os.environ.get("ORA_PW_FILE")
     splunkToken = os.getenv("SPLUNK_TOKEN")
@@ -36,15 +32,17 @@ def init(name: str):
     logger = getLogger(logPathname)
 
     if configPath:
-        settingsJson = os.path.join(configPath, f"{name}Settings.json")
+        settingsJson = os.path.join(configPath, f"{name}Settings.yml")
     else:
         raise Exception("Config path not set.")
 
     settings = loadSettings(logger, settingsJson)
+
     setLoggingLevel(logger, settings.get("log_level"))
 
     if oraDbDsn:
-        oraDbDsn = oraDbDsn[18:]
+        if "jdbc:" in oraDbDsn:
+            oraDbDsn = oraDbDsn[19:]
     else:
         raise Exception("DB DSN not set.")
 
@@ -89,13 +87,14 @@ def loadSettings(logger, settingsJson: str):
     """Load settings from a JSON file.
 
     Arguments:
-        settingsJson:  Settings jSON pathname
+        settingsJson:  SettingsFile pathname
     """
+    global settings
     logger.debug(f"Loading settings from {settingsJson}.")
 
     try:
         with open(settingsJson) as json_file:
-            settings = json.load(json_file)
+            settings = yaml.safe_load(json_file)
 
     except Exception as error:
         raise Exception(f"Unable to load settings from {settingsJson}.") from error
@@ -150,7 +149,36 @@ def createSettings():
     with open(
         r"C:\Users\dbernhardy\source\repos\DailyProcessMonitor\settings.json", "w"
     ) as json_file:
-        json.dump(settings, json_file)
+        yaml.dump(settings, json_file)
+
+
+def load_schedule(alerts, tasks):
+    logger.info("Loading monitoring schedule:")
+    interval = ":{:02d}"
+    schedule.clear()
+
+    for i in range(0, 60):
+        schedule.every().hour.at(interval.format(i)).do(
+            loadSettings, logger, settingsJson
+        )
+
+    for alert in alerts:
+        enabled = alerts.get(alert).get("enabled")
+        intvl = alerts.get(alert).get("interval_minutes")
+        funct = tasks.get(alert)
+
+        if enabled:
+            logger.info(f"{alert} will run every {intvl} minutes")
+            for i in range(0, 60, intvl):
+                schedule.every().hour.at(interval.format(i)).do(funct)
+
+
+def settings_updated(settings, notifications, ecbm, sm, pm):
+    logger.info("settings updated...")
+    ecbm.__settings = settings
+    notifications.__settings = settings
+    pm.__settings = settings
+    sm.__settings = settings
 
 
 if __name__ == "__main__":
@@ -158,8 +186,8 @@ if __name__ == "__main__":
     logger, settings, settingsJson, dbDsn, dbUser, dbPassword = init(scriptName)
 
     try:
-        emailer = Emailer(logger, settings["send_alerts_from"])
-        splunkApi = SplunkApi(
+        emailer = lib.Emailer(logger)
+        splunkApi = lib.SplunkApi(
             logger,
             settings["splunk_url"],
             settings["splunk_token"],
@@ -167,35 +195,46 @@ if __name__ == "__main__":
             settings["splunk_cache"],
         )
 
-        # db = DB(dsn=dbDsn, user=dbUser, password=dbPassword)
-        db = way4Db(logger, dsn=dbDsn, user=dbUser, password=dbPassword)
-        notifications = NoticationManager(logger, settings, db, emailer)
-        sm = SchedulerMonitor(logger, settings, db, emailer, splunkApi, notifications)
-        pm = ProcessMonitor(logger, settings, emailer, splunkApi)
+        db = datalayer.way4Db(logger, dsn=dbDsn, user=dbUser, password=dbPassword)
+        # db = datalayer.way4Db(logger, dsn=dbDsn, user=dbUser, password=dbPassword)
+        notifications = lib.NoticationManager(logger, settings, db, emailer)
+        ecbm = monitors.EcbConversionMonitor(
+            logger, settings, db, emailer, splunkApi, notifications
+        )
+        sm = monitors.SchedulerMonitor(
+            logger, settings, db, emailer, splunkApi, notifications
+        )
+        pm = monitors.ProcessMonitor(logger, settings, emailer, splunkApi)
 
         """ Start the WAY4 process monitors.
         """
         logger.info("Starting Daily Monitors")
         loadSettings(logger, settingsJson)
-        schedule.every(1).minutes.do(loadSettings, logger, settingsJson)
-        interval = ":{:02d}"
 
-        for i in range(0, 60, 5):
-            schedule.every().hour.at(interval.format(i)).do(pm.checkExpectedProcesses)
-            schedule.every().hour.at(interval.format(i)).do(sm.checkSchedulerInstances)
+        tasks = {}
+        tasks["checkExpectedProcesses"] = pm.checkExpectedProcesses
+        tasks["checkSchedulerInstances"] = sm.checkSchedulerInstances
+        tasks["checkForWAY4SchedulerInvaildJobs"] = sm.checkForWAY4SchedulerInvaildJobs
+        tasks["checkSchedulerForDelays"] = sm.checkSchedulerForDelays
+        tasks["checkForDelayedEcbFiles"] = ecbm.checkForDelayedEcbFiles
 
-        for i in range(0, 60, 10):
-            schedule.every().hour.at(interval.format(i)).do(
-                sm.checkForWAY4SchedulerInvaildJobs
-            )
-            schedule.every().hour.at(interval.format(i)).do(
-                sm.checkSchedulerForDelays, 10
-            )
+        current_settings = settings
+        current_alerts = None
 
         while True:
+            if current_settings != settings:
+                current_settings = settings
+                settings_updated(current_settings, notifications, ecbm, sm, pm)
+
+            if current_alerts != settings.get("alerts").get("configured_alerts"):
+                logger.info("Loading new schedule...")
+                current_alerts = settings.get("alerts").get("configured_alerts")
+                load_schedule(current_alerts, tasks)
+
             schedule.run_pending()
             time.sleep(1)
 
     except Exception as error:
         logger.exception(error)
+
         print(error.args)

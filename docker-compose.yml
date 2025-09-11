@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   app:
     image: prepaid_monitor
@@ -10,8 +8,8 @@ services:
     env_file:
       - .env
     volumes: 
-      - /Users/don/logs:/logs
-      - /Users/don/plsd-admin:/plsd-admin
-      - /Users/don/sys-utils:/sys-utils
+      - /Users/don/logs:/usr/prod/ppol/logs
+      - /Users/don/plsd-admin:/usr/prod/ppol/plsd-admin
+      - /Users/don/sys-utils://usr/prod/ppol/sys-utils
       - /tmp:/tmp
 

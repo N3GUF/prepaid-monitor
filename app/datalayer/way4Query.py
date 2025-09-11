@@ -116,9 +116,46 @@ class Query(Monitor):
       					, file_rec_date
       					, round(total_debit_amt / 100, 2)
       					, round(total_credit_amt / 100, 2)
+                        , source_corp_acnt
+                        , imm_origin_name
    					 from sdbatch1.ach_file
   					where file_type = 'ACH'
     				  and file_rec_date >= to_date('{}', 'MM-DD-YYYY HH24:MI:SS')
                  		       """.format(
             last_run.strftime("%m-%d-%Y %H:%M:%S")
         )
+
+    @staticmethod
+    def DelayedEcbFileQuery(upper_limit_hours: float, lower_limit_hours: float):
+        return f""" select file_type
+      					, status
+      					, file_name
+      					, file_rec_date
+      					, round(total_debit_amt / 100, 2)
+      					, round(total_credit_amt / 100, 2)
+                        , source_corp_acnt
+                        , imm_origin_name
+					 from sdbatch1.ach_file 
+					where file_type='ECB' 
+  					  and STATUS in ('0','200','301','100') 
+                      and file_rec_date < sysdate - numtodsinterval({upper_limit_hours}, 'hour')
+                      and file_rec_date > sysdate - numtodsinterval({lower_limit_hours}, 'hour')
+                      and imm_origin_name = 'EMPLOYBRIDGE'
+                      and file_review_st <> 'RDYFORPRCS'
+                union all
+                select file_type
+      					, status
+      					, file_name
+      					, file_rec_date
+      					, round(total_debit_amt / 100, 2)
+      					, round(total_credit_amt / 100, 2)
+                        , source_corp_acnt
+                        , imm_origin_name
+					 from sdbatch1.ach_file 
+					where file_type='ECB' 
+  					  and STATUS in ('0','200','301','100') 
+                      and file_rec_date < sysdate - numtodsinterval({upper_limit_hours}, 'hour')
+                      and file_rec_date > sysdate - numtodsinterval({lower_limit_hours}, 'hour')
+                      and imm_origin_name <> 'EMPLOYBRIDGE'
+                   order by file_rec_date, source_corp_acnt   
+           """
