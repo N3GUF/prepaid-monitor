@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+splunkToken.txt
+nohup.out
+.python-version
+**/.DS_Store
+*/*.env
+
+.env
+.docker-compose.yml.swp
+packages/

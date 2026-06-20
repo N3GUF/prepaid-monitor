@@ -1,8 +1,8 @@
 ## ------------------------------- Builder Stage ------------------------------ ## 
 FROM python:3.12-bookworm AS builder
 
-RUN apt-get update && apt-get install --no-install-recommends -y \
-        build-essential && \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install --no-install-recommends -y \
+        build-essential apt-utils && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Download the latest installer, install it and then remove it
@@ -21,7 +21,9 @@ RUN uv sync --no-cache-dir
 FROM python:3.12-slim-bookworm AS production
 
 # Update system packages to fix vulnerabilities
-RUN apt-get update && apt-get upgrade -y && \
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y apt-utils && \
+    apt-get upgrade -y && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG USERNAME=prdadmin

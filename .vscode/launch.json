@@ -1,0 +1,34 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "configurations": [
+        {
+            "name": "Windows",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app/prepaid-monitor.py",
+            "console": "integratedTerminal",
+            "envFile": "${workspaceFolder}/.vscode/pc-local.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Mac OS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app/prepaid-monitor.py",
+            "console": "integratedTerminal",
+            "envFile": "${workspaceFolder}/.vscode/mac-local.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Dev Container",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app/prepaid-monitor.py",
+            "console": "integratedTerminal",
+            //"envFile": "${workspaceFolder}/.vscode/docker.env",
+            "justMyCode": true
+        },
+    ]
+}
