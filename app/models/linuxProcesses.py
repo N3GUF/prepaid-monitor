@@ -35,8 +35,11 @@ class LinuxProcesses:
                     ["ssh", server, "ps", "-fu", user], stdout=subprocess.PIPE
                 )
 
+                if result.stdout is None:
+                    continue
+
                 for i, process in enumerate(
-                    io.TextIOWrapper(result.stdout, encoding="utf-8")  # type: ignore
+                    io.TextIOWrapper(result.stdout, encoding="utf-8")
                 ):
                     if i == 0:
                         continue

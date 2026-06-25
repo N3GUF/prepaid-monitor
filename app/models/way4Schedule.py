@@ -25,7 +25,7 @@ class WAY4Job:
     def get(self):
         return self.list
 
-    def CalculateExpectedEndTime(self, duration) -> datetime.datetime:
+    def CalculateExpectedEndTime(self, duration) -> None:
         if self.expectedStart is None:
             self.expectedEnd = None
             return

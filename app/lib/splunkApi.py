@@ -7,7 +7,7 @@ import requests
 
 class ISplunkApi(Protocol):
     def SendToSplunk(
-        self, event: dict, resend: bool = False, verify: bool = False
+        self, event: dict, host: str, resend: bool = False, verify: bool = False
     ) -> Tuple[bool, str]: ...
 
 

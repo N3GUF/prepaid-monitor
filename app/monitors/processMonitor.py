@@ -4,7 +4,7 @@ import monitors
 
 
 class ProcessMonitor(monitors.Monitor):
-    def checkExpectedProcesses(self):
+    def checkExpectedProcesses(self) -> None:
         """Verify that other expected processes are running."""
         self.__logger.debug("Checking for expected processes")
         user = (
