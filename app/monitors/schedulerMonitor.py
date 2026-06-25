@@ -147,7 +147,7 @@ class SchedulerMonitor(monitors.Monitor):
         buffer = datetime.timedelta(minutes=10)
         alert = None
         alerts = []
-        host = ""
+        host = "Unknown"
 
         for job in self.sched.list:
             if job.expectedStart:
@@ -158,13 +158,13 @@ class SchedulerMonitor(monitors.Monitor):
                 ):
                     alert = f"PayCard WAY4 Scheduler job {job.jobname} has not started by {job.expectedStart}."
                     alerts.append(alert)
-                    host = job.station
+                    host = job.station or "Unknown"
 
             if job.expectedEnd:
                 if now > job.expectedEnd and job.call_status != "F":
                     alert = f"PayCard Scheduler job {job.jobname} has not ended by {job.expectedEnd}."
                     alerts.append(alert)
-                    host = job.station
+                    host = job.station or "Unknown"
 
             if job.call_status == "R":
                 self.__logger.debug(
