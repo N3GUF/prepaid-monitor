@@ -206,22 +206,27 @@ if __name__ == "__main__":
         )
         pm = monitors.ProcessMonitor(logger, settings, emailer, splunkApi)
 
-        """ Start the WAY4 process monitors.
-        """
-        logger.info("Starting Daily Monitors")
-        loadSettings(logger, settingsJson)
+    except Exception:
+        logger.exception("Fatal error during startup — cannot continue.")
+        raise
 
-        tasks = {}
-        tasks["checkExpectedProcesses"] = pm.checkExpectedProcesses
-        tasks["checkSchedulerInstances"] = sm.checkSchedulerInstances
-        tasks["checkForWAY4SchedulerInvaildJobs"] = sm.checkForWAY4SchedulerInvaildJobs
-        tasks["checkSchedulerForDelays"] = sm.checkSchedulerForDelays
-        tasks["checkForDelayedEcbFiles"] = ecbm.checkForDelayedEcbFiles
+    """ Start the WAY4 process monitors.
+    """
+    logger.info("Starting Daily Monitors")
+    loadSettings(logger, settingsJson)
 
-        current_settings = settings
-        current_alerts = None
+    tasks = {}
+    tasks["checkExpectedProcesses"] = pm.checkExpectedProcesses
+    tasks["checkSchedulerInstances"] = sm.checkSchedulerInstances
+    tasks["checkForWAY4SchedulerInvaildJobs"] = sm.checkForWAY4SchedulerInvaildJobs
+    tasks["checkSchedulerForDelays"] = sm.checkSchedulerForDelays
+    tasks["checkForDelayedEcbFiles"] = ecbm.checkForDelayedEcbFiles
 
-        while True:
+    current_settings = settings
+    current_alerts = None
+
+    while True:
+        try:
             if current_settings != settings:
                 current_settings = settings
                 settings_updated(current_settings, notifications, ecbm, sm, pm)
@@ -232,9 +237,10 @@ if __name__ == "__main__":
                 load_schedule(current_alerts, tasks)
 
             schedule.run_pending()
-            time.sleep(1)
 
-    except Exception as error:
-        logger.exception(error)
+        except Exception:
+            logger.exception(
+                "Unhandled exception in monitor loop — application will continue running."
+            )
 
-        print(error.args)
+        time.sleep(1)
