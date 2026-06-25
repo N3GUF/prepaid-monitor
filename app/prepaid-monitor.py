@@ -105,6 +105,8 @@ def loadSettings(logger, settingsJson: str):
 
 def setLoggingLevel(logger, logLevel) -> None:
     """Create application Log"""
+    if logLevel is None:
+        return
     logLevel = logLevel.lower()
 
     if logLevel == "debug":
@@ -175,10 +177,10 @@ def load_schedule(alerts, tasks):
 
 def settings_updated(settings, notifications, ecbm, sm, pm):
     logger.info("settings updated...")
-    ecbm.__settings = settings
-    notifications.__settings = settings
-    pm.__settings = settings
-    sm.__settings = settings
+    ecbm.update_settings(settings)
+    notifications.update_settings(settings)
+    pm.update_settings(settings)
+    sm.update_settings(settings)
 
 
 if __name__ == "__main__":
@@ -192,7 +194,7 @@ if __name__ == "__main__":
             settings["splunk_url"],
             settings["splunk_token"],
             settings["splunk_index"],
-            settings["splunk_cache"],
+            settings.get("splunk_cache"),
         )
 
         db = datalayer.way4Db(logger, dsn=dbDsn, user=dbUser, password=dbPassword)
@@ -240,7 +242,7 @@ if __name__ == "__main__":
 
         except Exception:
             logger.exception(
-                "Unhandled exception in monitor loop — application will continue running."
+                "Unhandled exception in monitor loop — monitoring will continue."
             )
 
         time.sleep(1)

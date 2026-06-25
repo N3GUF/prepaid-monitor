@@ -88,6 +88,9 @@ class Monitor:
         if self.__settings.get("report_to_splunk"):
             self.__splunkApi.SendToSplunk(incident, host)
 
+    def update_settings(self, settings) -> None:
+        self.__settings = settings
+
     def __init__(self, logger, settings, emailer, splunkApi):
         self.__logger = logger
         self.__settings = settings

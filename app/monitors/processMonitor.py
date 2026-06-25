@@ -89,6 +89,10 @@ class ProcessMonitor(monitors.Monitor):
                 server,
             )
 
+    def update_settings(self, settings) -> None:
+        super().update_settings(settings)
+        self.__settings = settings
+
     def __init__(self, logger, settings, emailer, splunkApi):
         monitors.Monitor.__init__(self, logger, settings, emailer, splunkApi)
         self.__logger = logger

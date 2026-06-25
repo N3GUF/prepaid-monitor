@@ -12,9 +12,11 @@ class EcbConversionMonitor(monitors.Monitor):
             self.__db,
             datalayer.Query.DelayedEcbFileQuery(
                 upper_limit_hours=self.__settings.get("alerts")
+                .get("configured_alerts")
                 .get(self.checkForDelayedEcbFiles.__name__)
                 .get("upper_limit_hours"),
                 lower_limit_hours=self.__settings.get("alerts")
+                .get("configured_alerts")
                 .get(self.checkForDelayedEcbFiles.__name__)
                 .get("lower_limit_hours"),
             ),
@@ -56,6 +58,10 @@ class EcbConversionMonitor(monitors.Monitor):
         else:
             self.__logger.debug("No delayed ECB files.")
 
+    def update_settings(self, settings) -> None:
+        super().update_settings(settings)
+        self.__settings = settings
+
     def __init__(self, logger, settings, db, emailer, splunkApi, notifier):
         monitors.Monitor.__init__(self, logger, settings, emailer, splunkApi)
         self.__logger = logger
@@ -66,4 +72,6 @@ class EcbConversionMonitor(monitors.Monitor):
 
 def shorten(file_name: str) -> str:
     parts = file_name.split(".")
+    if len(parts) < 4:
+        return file_name
     return f"{parts[1]}.{parts[2]}.{parts[3]}"
