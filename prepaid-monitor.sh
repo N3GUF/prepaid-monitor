@@ -9,7 +9,6 @@ else
     exit 1
 fi
 
-export ORA_DB_DSN=us-atl-pa-ppd-db-p-n-001:1521/ppdprd
 export SPLUNK_INDEX=pmts-prod-fintwist
 export SPLUNK_CACHE=/tmp/pmts-prod-fintwist-splunk-cache.json
 export TOKEN_FILE=${SCRIPT_HOME}/prepaid-monitor/splunkToken.txt

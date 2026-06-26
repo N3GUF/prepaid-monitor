@@ -26,27 +26,30 @@ class LinuxProcess:
 
 class LinuxProcesses:
     def __init__(self, servers, user):
-        list = []
         self.processes = {}
 
         for server in servers:
+            proc_list = []
             try:
                 result = subprocess.Popen(
-                    ["ssh", server, " ps", "-fu", user], stdout=subprocess.PIPE
+                    ["ssh", server, "ps", "-fu", user], stdout=subprocess.PIPE
                 )
 
+                if result.stdout is None:
+                    continue
+
                 for i, process in enumerate(
-                    io.TextIOWrapper(result.stdout, encoding="utf-8")  # type: ignore
+                    io.TextIOWrapper(result.stdout, encoding="utf-8")
                 ):
                     if i == 0:
                         continue
 
-                    list.append(LinuxProcess(process.strip().split()))
+                    proc_list.append(LinuxProcess(process.strip().split()))
 
-            except subprocess.CalledProcessError:
+            except OSError:
                 pass
 
-            self.processes[server] = list
+            self.processes[server] = proc_list
 
     def get(self):
         return self.processes

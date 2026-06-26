@@ -1,15 +1,14 @@
 services:
   app:
     image: prepaid_monitor
-    build: 
+    build:
       context: .
-      target: prod
+      target: production
     container_name: prepaid_monitor
     env_file:
       - .env
-    volumes: 
-      - /Users/don/logs:/usr/prod/ppol/logs
-      - /Users/don/plsd-admin:/usr/prod/ppol/plsd-admin
-      - /Users/don/sys-utils://usr/prod/ppol/sys-utils
+    volumes:
+      - ${HOME}/logs:/usr/prod/ppol/logs
+      - ${HOME}/plsd-admin:/usr/prod/ppol/plsd-admin
+      - ${HOME}/sys-utils/conf:/usr/prod/ppol/sys-utils/conf
       - /tmp:/tmp
-

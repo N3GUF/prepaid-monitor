@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/don.bernhardy/source/repos/prepaid-monitor ls-files --error-unmatch '**/.DS_Store')",
+      "Bash(git *)",
+      "Bash(uv run *)",
+      "Bash(uv sync *)",
+      "Read(//workspaces/**)",
+      "Bash(python3 -m ruff --version)",
+      "Bash(pip install *)",
+      "Bash(python3 -m ruff check app/)",
+      "Bash(python3 -m ruff format app/)",
+      "Bash(~/.local/bin/ruff check *)",
+      "Bash(~/.local/bin/ruff format *)",
+      "Bash(docker compose up *)",
+      "Bash(docker run *)",
+      "Bash(docker system df *)"
+    ]
+  }
+}

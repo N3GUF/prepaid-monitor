@@ -1,8 +1,8 @@
 ## ------------------------------- Builder Stage ------------------------------ ## 
-FROM python:3.12-bookworm AS builder
+FROM python:3.12-trixie AS builder
 
-RUN apt-get update && apt-get install --no-install-recommends -y \
-        build-essential && \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install --no-install-recommends -y \
+        build-essential apt-utils && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Download the latest installer, install it and then remove it
@@ -18,10 +18,12 @@ COPY pyproject.toml .
 RUN uv sync --no-cache-dir
 
 ## ------------------------------- Production Stage ------------------------------ ##
-FROM python:3.12-slim-bookworm AS production
+FROM python:3.12-slim-trixie AS production
 
 # Update system packages to fix vulnerabilities
-RUN apt-get update && apt-get upgrade -y && \
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y apt-utils && \
+    apt-get upgrade -y && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG USERNAME=prdadmin
@@ -50,8 +52,8 @@ USER ${USERNAME}
 
 WORKDIR /usr/prod/ppol/sys-utils/bin/prepaid-monitor
 
-COPY . .
-COPY --from=builder /app/.venv .venv
+COPY --chown=${USERNAME}:${USERNAME} . .
+COPY --chown=${USERNAME}:${USERNAME} --from=builder /app/.venv .venv
 
 # Set up environment variables for production
 ENV PATH="/usr/prod/ppol/sys-utils/bin/prepaid-monitor/.venv/bin:$PATH"

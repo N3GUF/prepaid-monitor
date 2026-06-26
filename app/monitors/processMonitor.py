@@ -4,7 +4,7 @@ import monitors
 
 
 class ProcessMonitor(monitors.Monitor):
-    def checkExpectedProcesses(self):
+    def checkExpectedProcesses(self) -> None:
         """Verify that other expected processes are running."""
         self.__logger.debug("Checking for expected processes")
         user = (
@@ -88,6 +88,10 @@ class ProcessMonitor(monitors.Monitor):
                 incident,
                 server,
             )
+
+    def update_settings(self, settings) -> None:
+        super().update_settings(settings)
+        self.__settings = settings
 
     def __init__(self, logger, settings, emailer, splunkApi):
         monitors.Monitor.__init__(self, logger, settings, emailer, splunkApi)

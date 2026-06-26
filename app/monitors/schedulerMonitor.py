@@ -98,14 +98,18 @@ class SchedulerMonitor(monitors.Monitor):
                 host = job.station
 
             incident = self.createIncident(
-                self.checkSchedulerForDelays.__name__,
+                self.checkForWAY4SchedulerInvaildJobs.__name__,
                 alert,
                 alerts,
             )
 
             incident["comments"] = "Please investigate."
             self.createAlert(
-                self.checkSchedulerForDelays.__name__, alert, alerts, incident, host
+                self.checkForWAY4SchedulerInvaildJobs.__name__,
+                alert,
+                alerts,
+                incident,
+                host,
             )
 
         else:
@@ -143,7 +147,7 @@ class SchedulerMonitor(monitors.Monitor):
         buffer = datetime.timedelta(minutes=10)
         alert = None
         alerts = []
-        host = ""
+        host = "Unknown"
 
         for job in self.sched.list:
             if job.expectedStart:
@@ -154,13 +158,13 @@ class SchedulerMonitor(monitors.Monitor):
                 ):
                     alert = f"PayCard WAY4 Scheduler job {job.jobname} has not started by {job.expectedStart}."
                     alerts.append(alert)
-                    host = job.station
+                    host = job.station or "Unknown"
 
             if job.expectedEnd:
                 if now > job.expectedEnd and job.call_status != "F":
                     alert = f"PayCard Scheduler job {job.jobname} has not ended by {job.expectedEnd}."
                     alerts.append(alert)
-                    host = job.station
+                    host = job.station or "Unknown"
 
             if job.call_status == "R":
                 self.__logger.debug(
@@ -201,6 +205,7 @@ class SchedulerMonitor(monitors.Monitor):
             datalayer.Query.JobStatusQuery(tuple(instances)),
         ).get()
 
+        jobs_to_remove = []
         for job in self.sched.list:
             for status in self.jobStatuses:
                 # if job.jobname != status.Sch_Job_State.name:
@@ -229,7 +234,10 @@ class SchedulerMonitor(monitors.Monitor):
                 self.__logger.warning(
                     f"Job {job.jobname} is not scheduled on any WAY4 Scheduler instance."
                 )
-                self.sched.list.remove(job)
+                jobs_to_remove.append(job)
+
+        for job in jobs_to_remove:
+            self.sched.list.remove(job)
 
         self.__logger.debug("Loading scheduler process data.")
         # processes, exception = self.__db.get_sch_job_processes()
@@ -298,6 +306,10 @@ class SchedulerMonitor(monitors.Monitor):
         )
 
         return last_run
+
+    def update_settings(self, settings) -> None:
+        super().update_settings(settings)
+        self.__settings = settings
 
     def __init__(self, logger, settings, db, emailer, splunkApi, notifier):
         monitors.Monitor.__init__(self, logger, settings, emailer, splunkApi)

@@ -7,7 +7,7 @@ import requests
 
 class ISplunkApi(Protocol):
     def SendToSplunk(
-        self, event: dict, resend: bool = False, verify: bool = False
+        self, event: dict, host: str, resend: bool = False, verify: bool = False
     ) -> Tuple[bool, str]: ...
 
 
@@ -46,11 +46,20 @@ class SplunkApi:
             "Authorization": self.__token,
             "content-type": "application/json",
         }
-        response = requests.post(self.__url, json=payload, headers=headers)
-
-        if response.reason == "OK":
+        try:
+            response = requests.post(
+                self.__url, json=payload, headers=headers, timeout=10
+            )
+        except requests.exceptions.Timeout:
+            self.__message += "http post to splunk HEC timed out\r\n"
+            self.__logger.warning(self.__message)
             if not resend:
-                self.__message += f"{event['priority']} Alarm sent to the splunk http event collector\r\n"
+                self.__sendToCache(event)
+            return False, self.__message
+
+        if response.ok:
+            if not resend:
+                self.__message += f"{event.get('priority', '')} Alarm sent to the splunk http event collector\r\n"
                 self.__logger.info(self.__message)
         else:
             self.__message += (
@@ -68,8 +77,12 @@ class SplunkApi:
         if self.__eventCacheFile is None:
             return
         if os.path.exists(self.__eventCacheFile):
-            with open(self.__eventCacheFile, "r") as f:
-                self.__eventCache = json.load(f)
+            try:
+                with open(self.__eventCacheFile, "r") as f:
+                    self.__eventCache = json.load(f)
+            except json.JSONDecodeError:
+                self.__logger.warning("Splunk event cache is corrupted; resetting.")
+                self.__eventCache = []
         else:
             self.__eventCache = []
 

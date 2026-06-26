@@ -105,6 +105,8 @@ def loadSettings(logger, settingsJson: str):
 
 def setLoggingLevel(logger, logLevel) -> None:
     """Create application Log"""
+    if logLevel is None:
+        return
     logLevel = logLevel.lower()
 
     if logLevel == "debug":
@@ -175,10 +177,10 @@ def load_schedule(alerts, tasks):
 
 def settings_updated(settings, notifications, ecbm, sm, pm):
     logger.info("settings updated...")
-    ecbm.__settings = settings
-    notifications.__settings = settings
-    pm.__settings = settings
-    sm.__settings = settings
+    ecbm.update_settings(settings)
+    notifications.update_settings(settings)
+    pm.update_settings(settings)
+    sm.update_settings(settings)
 
 
 if __name__ == "__main__":
@@ -192,12 +194,12 @@ if __name__ == "__main__":
             settings["splunk_url"],
             settings["splunk_token"],
             settings["splunk_index"],
-            settings["splunk_cache"],
+            settings.get("splunk_cache"),
         )
 
         db = datalayer.way4Db(logger, dsn=dbDsn, user=dbUser, password=dbPassword)
         # db = datalayer.way4Db(logger, dsn=dbDsn, user=dbUser, password=dbPassword)
-        notifications = lib.NoticationManager(logger, settings, db, emailer)
+        notifications = lib.NotificationManager(logger, settings, db, emailer)
         ecbm = monitors.EcbConversionMonitor(
             logger, settings, db, emailer, splunkApi, notifications
         )
@@ -206,22 +208,27 @@ if __name__ == "__main__":
         )
         pm = monitors.ProcessMonitor(logger, settings, emailer, splunkApi)
 
-        """ Start the WAY4 process monitors.
-        """
-        logger.info("Starting Daily Monitors")
-        loadSettings(logger, settingsJson)
+    except Exception:
+        logger.exception("Fatal error during startup — cannot continue.")
+        raise
 
-        tasks = {}
-        tasks["checkExpectedProcesses"] = pm.checkExpectedProcesses
-        tasks["checkSchedulerInstances"] = sm.checkSchedulerInstances
-        tasks["checkForWAY4SchedulerInvaildJobs"] = sm.checkForWAY4SchedulerInvaildJobs
-        tasks["checkSchedulerForDelays"] = sm.checkSchedulerForDelays
-        tasks["checkForDelayedEcbFiles"] = ecbm.checkForDelayedEcbFiles
+    """ Start the WAY4 process monitors.
+    """
+    logger.info("Starting Daily Monitors")
+    loadSettings(logger, settingsJson)
 
-        current_settings = settings
-        current_alerts = None
+    tasks = {}
+    tasks["checkExpectedProcesses"] = pm.checkExpectedProcesses
+    tasks["checkSchedulerInstances"] = sm.checkSchedulerInstances
+    tasks["checkForWAY4SchedulerInvaildJobs"] = sm.checkForWAY4SchedulerInvaildJobs
+    tasks["checkSchedulerForDelays"] = sm.checkSchedulerForDelays
+    tasks["checkForDelayedEcbFiles"] = ecbm.checkForDelayedEcbFiles
 
-        while True:
+    current_settings = settings
+    current_alerts = None
+
+    while True:
+        try:
             if current_settings != settings:
                 current_settings = settings
                 settings_updated(current_settings, notifications, ecbm, sm, pm)
@@ -232,9 +239,10 @@ if __name__ == "__main__":
                 load_schedule(current_alerts, tasks)
 
             schedule.run_pending()
-            time.sleep(1)
 
-    except Exception as error:
-        logger.exception(error)
+        except Exception:
+            logger.exception(
+                "Unhandled exception in monitor loop — monitoring will continue."
+            )
 
-        print(error.args)
+        time.sleep(1)
