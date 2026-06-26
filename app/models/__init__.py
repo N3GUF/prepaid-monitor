@@ -1,4 +1,4 @@
-from models.WAY4AchFile import WAY4AchFiles
+from models.WAY4AchFile import WAY4AchFile, WAY4AchFiles
 from models.way4FileInfo import WAY4FileInfo, WAY4Files
 from models.linuxProcesses import LinuxProcesses
 from models.way4JobStatus import WAY4JobStatuses

@@ -199,7 +199,7 @@ if __name__ == "__main__":
 
         db = datalayer.way4Db(logger, dsn=dbDsn, user=dbUser, password=dbPassword)
         # db = datalayer.way4Db(logger, dsn=dbDsn, user=dbUser, password=dbPassword)
-        notifications = lib.NoticationManager(logger, settings, db, emailer)
+        notifications = lib.NotificationManager(logger, settings, db, emailer)
         ecbm = monitors.EcbConversionMonitor(
             logger, settings, db, emailer, splunkApi, notifications
         )
